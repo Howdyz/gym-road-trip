@@ -205,6 +205,48 @@
   .opt input:checked::before{transform:scale(1)}
   .opt input:focus-visible{outline:2px solid var(--o2);outline-offset:2px}
 
+  /* where the app thinks you are - shown so a bad fix is obvious */
+  .locbar{
+    display:none;align-items:center;gap:10px;margin:0 2px 14px;padding:11px 13px;
+    border-radius:13px;border:1px solid rgba(255,157,47,.3);
+    background:linear-gradient(135deg,rgba(255,95,31,.12),rgba(255,45,120,.08));
+    font-size:13px;color:var(--ink);font-weight:600;
+  }
+  .locbar.show{display:flex}
+  .locbar .dot{
+    width:9px;height:9px;border-radius:50%;flex-shrink:0;
+    background:var(--o2);box-shadow:0 0 0 0 rgba(255,157,47,.7);
+    animation:ping 2s ease-out infinite;
+  }
+  @keyframes ping{
+    0%{box-shadow:0 0 0 0 rgba(255,157,47,.65)}
+    70%{box-shadow:0 0 0 10px rgba(255,157,47,0)}
+    100%{box-shadow:0 0 0 0 rgba(255,157,47,0)}
+  }
+  .locbar .where{flex:1;min-width:0}
+  .locbar .where span{display:block;color:var(--dim);font-weight:500;font-size:11.5px;margin-top:1px}
+  .locbar button{
+    background:rgba(255,255,255,.08);border:1px solid var(--line);color:var(--ink);
+    font-size:12px;font-weight:800;padding:8px 12px;border-radius:10px;flex-shrink:0;min-height:38px;
+  }
+
+  /* blocked-permission recovery */
+  .status.blocked{
+    text-align:left;padding:20px 18px;border-radius:16px;
+    border:1px solid rgba(255,138,128,.35);background:rgba(255,138,128,.07);
+  }
+  .status.blocked b{display:block;font-size:15.5px;color:var(--ink);margin-bottom:8px;font-weight:800}
+  .status.blocked p{margin:0 0 12px;font-size:14px;color:var(--dim);line-height:1.6}
+  .status.blocked ol{margin:0 0 14px;padding-left:20px;font-size:13.5px;color:var(--ink);line-height:1.85}
+  .status.blocked ol code{
+    background:rgba(255,255,255,.08);padding:1px 6px;border-radius:5px;
+    font-size:12.5px;font-family:ui-monospace,Menlo,monospace;
+  }
+  .status.blocked .again{
+    width:100%;padding:13px;border-radius:12px;font-weight:800;font-size:14.5px;
+    background:linear-gradient(135deg,var(--o1),var(--o2));color:#170a02;min-height:46px;
+  }
+
   /* ---- status ---- */
   /* add-to-home-screen prompt */
   .install{
@@ -371,6 +413,12 @@
       <input type="checkbox" id="studios">
       <span>Also show yoga, pilates &amp; climbing studios</span>
     </label>
+  </div>
+
+  <div class="locbar" id="locbar">
+    <i class="dot"></i>
+    <div class="where" id="where"></div>
+    <button id="notme">Not here?</button>
   </div>
 
   <div id="out"></div>
@@ -600,17 +648,94 @@
     });
   }
 
-  locateBtn.addEventListener('click', function(){
-    if(!navigator.geolocation){ fail('This browser has no GPS support. Search by city instead.'); return; }
+  // ---- location -----------------------------------------------------------
+  var locbar = document.getElementById('locbar');
+  var whereEl = document.getElementById('where');
+
+  // A fix is useless if it is silently wrong, so always show where we landed.
+  function showWhere(origin, accuracy){
+    var acc = accuracy == null ? '' :
+      (accuracy > 1609 ? ' · accurate to about ' + Math.round(accuracy/1609) + ' mi'
+                       : ' · accurate to about ' + Math.round(accuracy) + ' m');
+    whereEl.innerHTML = '<b>Using your location</b><span>Finding where that is…' + esc(acc) + '</span>';
+    locbar.classList.add('show');
+
+    fetch('https://nominatim.openstreetmap.org/reverse?format=json&zoom=12&lat='
+          + origin.lat + '&lon=' + origin.lon)
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var a = d.address || {};
+        var place = a.city || a.town || a.village || a.hamlet || a.county || '';
+        var st = a.state || '';
+        var name = [place, st].filter(Boolean).join(', ') || 'your current position';
+        whereEl.innerHTML = '<b>Near ' + esc(name) + '</b><span>From your device' + esc(acc) + '</span>';
+      })
+      .catch(function(){
+        whereEl.innerHTML = '<b>Using your location</b><span>From your device' + esc(acc) + '</span>';
+      });
+  }
+
+  document.getElementById('notme').addEventListener('click', function(){
+    locbar.classList.remove('show');
+    placeEl.focus();
+    placeEl.scrollIntoView({behavior:'smooth', block:'center'});
+  });
+
+  // Browsers can block location with no prompt at all - say so, and say how to undo it.
+  function blockedHelp(){
+    var ua = navigator.userAgent;
+    var iOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+    var android = /Android/.test(ua);
+    var steps;
+    if(iOS){
+      steps = '<li>Open <code>Settings</code> &rsaquo; <code>Privacy &amp; Security</code> &rsaquo; <code>Location Services</code></li>'
+            + '<li>Make sure it is on, then pick your browser and choose <code>While Using the App</code></li>'
+            + '<li>Come back here and tap Try again</li>';
+    } else if(android){
+      steps = '<li>Tap the lock icon next to the web address</li>'
+            + '<li>Choose <code>Permissions</code> and turn <code>Location</code> on</li>'
+            + '<li>Come back here and tap Try again</li>';
+    } else {
+      steps = '<li>Click the lock or location icon in the address bar</li>'
+            + '<li>Set <code>Location</code> to <code>Allow</code></li>'
+            + '<li>Reload the page, then click Try again</li>';
+    }
+    show('<div class="status blocked">'
+       + '<b>Your browser is blocking location</b>'
+       + '<p>It turned the request down without asking you — so this is a browser setting, '
+       + 'not something the app can switch on. Two taps to fix:</p>'
+       + '<ol>' + steps + '</ol>'
+       + '<button class="again" id="retryLoc">Try again</button>'
+       + '</div>');
+    document.getElementById('retryLoc').addEventListener('click', function(){ locate(); });
+  }
+
+  function locate(){
+    if(!navigator.geolocation){
+      fail('This browser cannot do location. Search by city instead.'); return;
+    }
     loading('Getting your location…');
     navigator.geolocation.getCurrentPosition(function(pos){
-      run({lat:pos.coords.latitude, lon:pos.coords.longitude}, 'you');
+      var origin = {lat:pos.coords.latitude, lon:pos.coords.longitude};
+      showWhere(origin, pos.coords.accuracy);
+      run(origin, 'you');
     }, function(err){
-      fail(err.code === 1
-        ? 'Location permission denied. Turn it on, or search by city below.'
-        : 'Could not get a GPS fix. Try searching by city instead.');
+      locbar.classList.remove('show');
+      if(err.code === 1) blockedHelp();
+      else if(err.code === 3) fail('Timed out waiting for a GPS fix. Try again outdoors, or search by city.');
+      else fail('Could not get your location. Try searching by city instead.');
     }, {enableHighAccuracy:true, timeout:12000, maximumAge:60000});
-  });
+  }
+
+  locateBtn.addEventListener('click', locate);
+
+  // If location is already granted, just use it - that is the whole point of the app.
+  if(navigator.permissions && navigator.permissions.query){
+    navigator.permissions.query({name:'geolocation'}).then(function(st){
+      if(st.state === 'granted') locate();
+      st.onchange = function(){ if(st.state === 'granted') locate(); };
+    }).catch(function(){});
+  }
 
   function geocode(){
     var q = placeEl.value.trim();
@@ -622,6 +747,7 @@
       .then(function(res){
         if(!res.length){ fail('Couldn’t find "' + q + '". Try a city and state.'); return; }
         var hit = res[0];
+        locbar.classList.remove('show');
         run({lat:+hit.lat, lon:+hit.lon}, hit.display_name.split(',').slice(0,2).join(',').trim());
       })
       .catch(function(){ fail('Location lookup failed. Check your connection.'); });
