@@ -1,0 +1,14 @@
+{
+  "name": "Gym Road Trip",
+  "short_name": "Gym Road Trip",
+  "description": "Find a gym to work out in anywhere in the US while you travel.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

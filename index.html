@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<title>Gym Road Trip — Find a gym anywhere in the US</title>
+<meta name="description" content="Traveling? Find a gym near you in seconds. Names, phone numbers, hours, and turn-by-turn directions to the closest place to work out.">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800;900&display=swap">
+<style>
+
+  :root{
+    --bg:#07080c; --ink:#f2f5f9; --dim:#8e97a8;
+    --o1:#ff5f1f; --o2:#ff9d2f; --pink:#ff2d78; --cyan:#22d3ee;
+    --glass:rgba(255,255,255,.045);
+    --line:rgba(255,255,255,.10);
+    --r:18px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;overflow-x:hidden}
+  body{
+    background:var(--bg); color:var(--ink);
+    font:16px/1.55 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    min-height:100dvh; position:relative;
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  /* ---- animated aurora behind everything ---- */
+  body::before,body::after{
+    content:"";position:fixed;z-index:-2;border-radius:50%;filter:blur(90px);pointer-events:none;
+  }
+  body::before{
+    width:70vw;height:70vw;max-width:620px;max-height:620px;top:-18vh;left:-22vw;
+    background:radial-gradient(circle,rgba(255,95,31,.42),transparent 68%);
+    animation:drift1 17s ease-in-out infinite;
+  }
+  body::after{
+    width:62vw;height:62vw;max-width:540px;max-height:540px;top:22vh;right:-26vw;
+    background:radial-gradient(circle,rgba(255,45,120,.34),transparent 68%);
+    animation:drift2 21s ease-in-out infinite;
+  }
+  @keyframes drift1{
+    0%,100%{transform:translate(0,0) scale(1)}
+    50%{transform:translate(9vw,7vh) scale(1.18)}
+  }
+  @keyframes drift2{
+    0%,100%{transform:translate(0,0) scale(1.1)}
+    50%{transform:translate(-8vw,-6vh) scale(.92)}
+  }
+  /* faint grid floor */
+  .grid{
+    position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.5;
+    background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),
+                     linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
+    background-size:46px 46px;
+    mask-image:linear-gradient(180deg,transparent,#000 42%,transparent 88%);
+    -webkit-mask-image:linear-gradient(180deg,transparent,#000 42%,transparent 88%);
+  }
+
+  /* ---- hero ---- */
+  header{
+    text-align:center;padding:38px 16px 26px;
+    padding-top:calc(38px + env(safe-area-inset-top));
+    position:relative;
+  }
+  .logo{
+    font-family:Anton,Impact,sans-serif;font-weight:400;
+    font-size:clamp(40px,12.5vw,66px);line-height:.92;margin:0;
+    letter-spacing:.5px;text-transform:uppercase;font-style:italic;
+  }
+  .logo .l1{display:block;color:#fff;text-shadow:0 0 34px rgba(255,255,255,.22)}
+  .logo .l2{
+    display:block;
+    background:linear-gradient(95deg,var(--o1),var(--o2) 42%,var(--pink));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 0 22px rgba(255,95,31,.55));
+  }
+  .streaks{display:flex;gap:5px;justify-content:center;margin:14px 0 0;height:4px}
+  .streaks i{
+    display:block;height:4px;border-radius:99px;
+    background:linear-gradient(90deg,var(--o1),var(--pink));
+    animation:zip 2.4s cubic-bezier(.4,0,.2,1) infinite;
+  }
+  .streaks i:nth-child(1){width:52px;animation-delay:0s}
+  .streaks i:nth-child(2){width:26px;animation-delay:.16s;opacity:.7}
+  .streaks i:nth-child(3){width:13px;animation-delay:.32s;opacity:.45}
+  @keyframes zip{
+    0%{transform:translateX(-26px);opacity:0}
+    22%{opacity:1}
+    70%{transform:translateX(26px);opacity:0}
+    100%{transform:translateX(26px);opacity:0}
+  }
+  .tag{
+    color:var(--dim);font-size:14.5px;margin:16px auto 0;max-width:330px;font-weight:500;
+  }
+  .tag b{color:var(--ink);font-weight:700}
+
+  main{max-width:520px;margin:0 auto;padding:6px 15px 44px}
+  header{max-width:640px;margin:0 auto}
+
+  /* Wider screens get a two-up result grid; the search panel stays a column. */
+  @media (min-width:800px){
+    main{max-width:940px}
+    #search,.install{max-width:520px;margin-left:auto;margin-right:auto}
+    #out{display:grid;grid-template-columns:1fr 1fr;gap:0 14px;align-items:start}
+    #out .count{grid-column:1 / -1}
+    .logo{font-size:72px}
+    .tag{font-size:16px;max-width:420px}
+  }
+
+  /* ---- glass search panel ---- */
+  .panel{
+    background:var(--glass);border:1px solid var(--line);border-radius:22px;
+    padding:18px;margin-bottom:20px;
+    backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+    box-shadow:0 22px 48px -24px rgba(0,0,0,.9), inset 0 1px 0 rgba(255,255,255,.07);
+    position:relative;overflow:hidden;
+  }
+  .panel::before{
+    content:"";position:absolute;inset:0 0 auto;height:1px;
+    background:linear-gradient(90deg,transparent,rgba(255,157,47,.85),transparent);
+  }
+  button{font:inherit;cursor:pointer;border:none;color:inherit}
+
+  .big{
+    width:100%;padding:18px;border-radius:15px;font-size:17.5px;font-weight:800;
+    letter-spacing:.2px;color:#170a02;position:relative;overflow:hidden;
+    background:linear-gradient(110deg,var(--o1),var(--o2) 50%,var(--o1));
+    background-size:220% 100%;
+    box-shadow:0 0 0 0 rgba(255,95,31,.55),0 12px 30px -10px rgba(255,95,31,.75);
+    animation:breathe 2.8s ease-in-out infinite, slide 5s linear infinite;
+    display:flex;align-items:center;justify-content:center;gap:10px;
+  }
+  @keyframes slide{to{background-position:-220% 0}}
+  @keyframes breathe{
+    0%,100%{box-shadow:0 0 0 0 rgba(255,95,31,.5),0 12px 30px -10px rgba(255,95,31,.7)}
+    50%{box-shadow:0 0 0 12px rgba(255,95,31,0),0 12px 34px -8px rgba(255,95,31,.95)}
+  }
+  .big:active{transform:scale(.98)}
+  .big .pin{font-size:20px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.25))}
+
+  .or{
+    display:flex;align-items:center;gap:12px;color:var(--dim);
+    font-size:11px;margin:18px 0;text-transform:uppercase;letter-spacing:2px;font-weight:700;
+  }
+  .or::before,.or::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--line),transparent)}
+
+  .row{display:flex;gap:9px}
+  input[type=text]{
+    flex:1;min-width:0;padding:15px 16px;border-radius:14px;
+    border:1px solid var(--line);background:rgba(0,0,0,.34);color:var(--ink);
+    font:inherit;font-weight:500;transition:border-color .2s,box-shadow .2s;
+  }
+  input[type=text]::placeholder{color:#6d768a}
+  input[type=text]:focus{
+    outline:none;border-color:var(--o2);
+    box-shadow:0 0 0 4px rgba(255,157,47,.15),0 0 26px -6px rgba(255,157,47,.55);
+  }
+  .go{
+    padding:0 22px;border-radius:14px;font-weight:800;color:var(--ink);
+    background:rgba(255,255,255,.07);border:1px solid var(--line);transition:.2s;
+  }
+  .go:hover{background:rgba(255,157,47,.18);border-color:var(--o2);color:#fff}
+
+  .radius{display:flex;align-items:center;gap:13px;margin-top:18px;font-size:13px;color:var(--dim);font-weight:600;text-transform:uppercase;letter-spacing:.8px}
+  .radius input[type=range]{
+    flex:1;-webkit-appearance:none;appearance:none;height:5px;border-radius:99px;background:rgba(255,255,255,.12);
+  }
+  .radius input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:22px;height:22px;border-radius:50%;
+    background:linear-gradient(135deg,var(--o2),var(--o1));
+    box-shadow:0 0 16px rgba(255,95,31,.9),0 0 0 4px rgba(255,95,31,.18);cursor:pointer;
+  }
+  .radius input[type=range]::-moz-range-thumb{
+    width:22px;height:22px;border:none;border-radius:50%;
+    background:linear-gradient(135deg,var(--o2),var(--o1));
+    box-shadow:0 0 16px rgba(255,95,31,.9);cursor:pointer;
+  }
+  .radius b{
+    color:#fff;min-width:60px;text-align:right;font-variant-numeric:tabular-nums;
+    font-size:15px;font-weight:800;text-shadow:0 0 14px rgba(255,157,47,.65);
+  }
+  .opt{display:flex;align-items:center;gap:11px;margin-top:16px;font-size:13.5px;color:var(--dim);cursor:pointer;font-weight:500;user-select:none}
+  .opt:hover{color:var(--ink)}
+  .opt input{
+    -webkit-appearance:none;appearance:none;margin:0;flex-shrink:0;
+    width:21px;height:21px;border-radius:7px;cursor:pointer;
+    border:1px solid var(--line);background:rgba(0,0,0,.34);
+    display:grid;place-content:center;transition:.18s;
+  }
+  .opt input::before{
+    content:"";width:11px;height:11px;transform:scale(0);transition:transform .16s ease-out;
+    clip-path:polygon(14% 45%,0 60%,39% 100%,100% 18%,85% 4%,39% 70%);
+    background:#170a02;
+  }
+  .opt input:checked{
+    background:linear-gradient(135deg,var(--o1),var(--o2));border-color:var(--o2);
+    box-shadow:0 0 16px -2px rgba(255,95,31,.8);
+  }
+  .opt input:checked::before{transform:scale(1)}
+  .opt input:focus-visible{outline:2px solid var(--o2);outline-offset:2px}
+
+  /* ---- status ---- */
+  /* add-to-home-screen prompt */
+  .install{
+    display:none;align-items:center;gap:12px;margin-bottom:16px;padding:14px 15px;
+    border-radius:16px;border:1px solid rgba(255,157,47,.4);
+    background:linear-gradient(135deg,rgba(255,95,31,.15),rgba(255,45,120,.12));
+    box-shadow:0 0 26px -10px rgba(255,95,31,.6);
+    animation:rise .5s cubic-bezier(.22,1,.36,1) both;
+  }
+  .install.show{display:flex}
+  .install .txt{flex:1;min-width:0;font-size:13.5px;line-height:1.45;color:var(--ink);font-weight:500}
+  .install .txt b{display:block;font-weight:800;font-size:14.5px;margin-bottom:2px}
+  .install .txt span{color:var(--dim)}
+  .install button{
+    flex-shrink:0;padding:10px 15px;border-radius:11px;font-weight:800;font-size:13.5px;
+    background:linear-gradient(135deg,var(--o1),var(--o2));color:#170a02;min-height:42px;
+  }
+  .install .x{
+    background:none;color:var(--dim);padding:6px 4px;font-size:19px;line-height:1;
+    min-height:0;flex-shrink:0;font-weight:400;
+  }
+
+  .status{text-align:center;color:var(--dim);padding:40px 14px;font-size:15px;font-weight:500}
+  .status.err{color:#ff8a80}
+  .bars{display:flex;gap:5px;justify-content:center;align-items:flex-end;height:34px;margin-bottom:18px}
+  .bars i{
+    width:6px;border-radius:99px;background:linear-gradient(180deg,var(--o2),var(--pink));
+    animation:pump .9s ease-in-out infinite;box-shadow:0 0 14px rgba(255,95,31,.65);
+  }
+  .bars i:nth-child(1){height:14px;animation-delay:0s}
+  .bars i:nth-child(2){height:26px;animation-delay:.12s}
+  .bars i:nth-child(3){height:34px;animation-delay:.24s}
+  .bars i:nth-child(4){height:26px;animation-delay:.36s}
+  .bars i:nth-child(5){height:14px;animation-delay:.48s}
+  @keyframes pump{0%,100%{transform:scaleY(.42)}50%{transform:scaleY(1)}}
+
+  /* ---- results ---- */
+  .count{
+    font-size:12px;color:var(--dim);margin:4px 2px 14px;
+    display:flex;justify-content:space-between;align-items:center;gap:10px;
+    text-transform:uppercase;letter-spacing:1.2px;font-weight:700;
+  }
+  .count em{color:var(--o2);font-style:normal}
+  .count button{
+    background:none;color:var(--o2);font-size:12px;font-weight:800;padding:0;
+    text-transform:uppercase;letter-spacing:1.2px;
+  }
+
+  .gym{
+    background:var(--glass);border:1px solid var(--line);border-radius:var(--r);
+    padding:17px 17px 17px 20px;margin-bottom:13px;position:relative;overflow:hidden;
+    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    box-shadow:0 16px 34px -22px rgba(0,0,0,.95);
+    animation:rise .5s cubic-bezier(.22,1,.36,1) both;
+    transition:transform .22s,border-color .22s,box-shadow .22s;
+  }
+  .gym::before{
+    content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+    background:linear-gradient(180deg,var(--o1),var(--pink));
+  }
+  .gym:hover{
+    transform:translateY(-3px);border-color:rgba(255,157,47,.4);
+    box-shadow:0 22px 46px -22px rgba(255,95,31,.5);
+  }
+  @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+
+  .top{display:flex;justify-content:space-between;gap:13px;align-items:flex-start}
+  .gym h2{margin:0;font-size:18px;font-weight:800;line-height:1.28;letter-spacing:-.2px}
+  .dist{text-align:right;flex-shrink:0;line-height:1}
+  .dist b{
+    display:block;font-family:Anton,Impact,sans-serif;font-weight:400;font-size:27px;
+    background:linear-gradient(135deg,var(--o2),var(--pink));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 0 13px rgba(255,95,31,.55));font-variant-numeric:tabular-nums;
+  }
+  .dist span{font-size:10px;color:var(--dim);letter-spacing:1.4px;font-weight:800;display:block;margin-top:3px}
+
+  .badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}
+  .badge{
+    font-size:10.5px;font-weight:800;padding:4px 10px;border-radius:99px;
+    background:rgba(255,255,255,.07);color:var(--dim);letter-spacing:.8px;
+    text-transform:uppercase;border:1px solid var(--line);
+  }
+  .badge.hot{
+    background:linear-gradient(135deg,rgba(255,95,31,.22),rgba(255,45,120,.22));
+    color:var(--o2);border-color:rgba(255,157,47,.45);
+    box-shadow:0 0 16px -4px rgba(255,95,31,.7);
+  }
+
+  .meta{margin-top:13px;font-size:14px;color:var(--dim);display:grid;gap:7px}
+  .meta div{display:flex;gap:9px;align-items:flex-start}
+  .meta .k{width:17px;flex-shrink:0;text-align:center;opacity:.8}
+  .meta a{color:var(--ink);text-decoration:none;border-bottom:1px solid rgba(255,157,47,.45)}
+  .meta a:hover{color:var(--o2)}
+
+  .acts{display:flex;gap:9px;margin-top:15px}
+  .acts a{
+    flex:1;text-align:center;padding:13px;border-radius:13px;text-decoration:none;
+    font-size:14.5px;font-weight:800;letter-spacing:.3px;transition:.18s;
+  }
+  .nav{
+    background:linear-gradient(135deg,var(--o1),var(--o2));color:#170a02;
+    box-shadow:0 10px 24px -12px rgba(255,95,31,.9);
+  }
+  .nav:hover{filter:brightness(1.1);box-shadow:0 12px 30px -10px rgba(255,95,31,1)}
+  .call{background:rgba(255,255,255,.07);color:var(--ink);border:1px solid var(--line)}
+  .call:hover{background:rgba(255,255,255,.13)}
+  .call.off{opacity:.35;pointer-events:none}
+
+  footer{
+    text-align:center;color:#6d768a;font-size:11.5px;padding:10px 16px 34px;line-height:1.8;
+    text-transform:uppercase;letter-spacing:.8px;font-weight:600;
+  }
+  footer a{color:#8e97a8}
+
+  /* Phone-first: hover does not exist on a touch screen - use :active instead. */
+  @media (hover:none){
+    .gym:hover{transform:none;border-color:var(--line);box-shadow:0 16px 34px -22px rgba(0,0,0,.95)}
+    .go:hover,.call:hover{background:rgba(255,255,255,.07)}
+    .nav:hover{filter:none}
+    .gym:active{transform:scale(.995)}
+    .acts a:active{filter:brightness(1.15)}
+    .go:active{background:rgba(255,157,47,.2)}
+  }
+  /* every tappable thing clears the 44px target minimum */
+  .acts a,.go,.big{min-height:48px;display:flex;align-items:center;justify-content:center}
+  .meta a{padding:2px 0;display:inline-block}
+
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation:none!important;transition:none!important}
+  }
+</style>
+</head>
+<body>
+
+<div class="grid"></div>
+
+<header>
+  <h1 class="logo"><span class="l1">Gym</span><span class="l2">Road Trip</span></h1>
+  <div class="streaks"><i></i><i></i><i></i></div>
+  <p class="tag">Anywhere in the country. Find the nearest place to <b>lift, run, or stretch out</b> — in seconds.</p>
+</header>
+
+<main>
+  <div class="install" id="install">
+    <div class="txt" id="installTxt"></div>
+    <button id="installGo">Install</button>
+    <button class="x" id="installNo" aria-label="Dismiss">&times;</button>
+  </div>
+
+  <div class="panel" id="search">
+    <button class="big" id="locate"><span class="pin">📍</span> Find gyms near me</button>
+    <div class="or">or search a place</div>
+    <div class="row">
+      <input type="text" id="place" placeholder="City, address, or ZIP" autocomplete="off" enterkeyhint="search">
+      <button class="go" id="goBtn">Go</button>
+    </div>
+    <label class="radius">
+      Within
+      <input type="range" id="rad" min="2" max="50" step="1" value="15">
+      <b id="radOut">15 mi</b>
+    </label>
+    <label class="opt">
+      <input type="checkbox" id="studios">
+      <span>Also show yoga, pilates &amp; climbing studios</span>
+    </label>
+  </div>
+
+  <div id="out"></div>
+</main>
+
+<footer>
+  Gym data from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors.<br>
+  Always call ahead — hours and day-pass rules change.
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  var MI = 3958.7613; // earth radius, miles
+  var out   = document.getElementById('out');
+  var radEl = document.getElementById('rad');
+  var radOut= document.getElementById('radOut');
+  var placeEl = document.getElementById('place');
+  var locateBtn = document.getElementById('locate');
+  var studiosEl = document.getElementById('studios');
+  var lastOrigin = null;
+  var lastLabel  = 'you';
+
+  radEl.addEventListener('input', function(){ radOut.textContent = radEl.value + ' mi'; });
+
+  function esc(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function show(html){ out.innerHTML = html; }
+  function loading(msg){ show('<div class="status"><div class="bars"><i></i><i></i><i></i><i></i><i></i></div>'+esc(msg)+'</div>'); }
+  function fail(msg){ show('<div class="status err">'+esc(msg)+'</div>'); }
+
+  // ---- geometry ----------------------------------------------------------
+  function distance(a, b){
+    var r = Math.PI/180;
+    var dLat = (b.lat-a.lat)*r, dLon = (b.lon-a.lon)*r;
+    var h = Math.sin(dLat/2)*Math.sin(dLat/2) +
+            Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dLon/2)*Math.sin(dLon/2);
+    return 2*MI*Math.asin(Math.min(1, Math.sqrt(h)));
+  }
+  function bearing(a, b){
+    var r = Math.PI/180;
+    var y = Math.sin((b.lon-a.lon)*r)*Math.cos(b.lat*r);
+    var x = Math.cos(a.lat*r)*Math.sin(b.lat*r) -
+            Math.sin(a.lat*r)*Math.cos(b.lat*r)*Math.cos((b.lon-a.lon)*r);
+    var deg = (Math.atan2(y,x)/r + 360) % 360;
+    return ['N','NE','E','SE','S','SW','W','NW'][Math.round(deg/45) % 8];
+  }
+
+  // ---- data source -------------------------------------------------------
+  // Swap this one function to move to Google Places / Foursquare later.
+  // Contract: returns a Promise of [{name, lat, lon, phone, website, hours, address, brand, osm}]
+  var ENDPOINTS = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter'
+  ];
+
+  function fetchGyms(origin, radiusMiles){
+    var m = Math.round(radiusMiles * 1609.34);
+    var q = '[out:json][timeout:30];('
+      + 'nwr["leisure"="fitness_centre"](around:'+m+','+origin.lat+','+origin.lon+');'
+      + 'nwr["amenity"="gym"](around:'+m+','+origin.lat+','+origin.lon+');'
+      + 'nwr["leisure"="sports_centre"]["sport"~"fitness|multi"](around:'+m+','+origin.lat+','+origin.lon+');'
+      + ');out center 400;';
+
+    var attempt = function(i){
+      return fetch(ENDPOINTS[i], {
+        method:'POST',
+        headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body:'data=' + encodeURIComponent(q)
+      }).then(function(r){
+        if(!r.ok) throw new Error('HTTP '+r.status);
+        return r.json();
+      }).catch(function(e){
+        if(i+1 < ENDPOINTS.length) return attempt(i+1);
+        throw e;
+      });
+    };
+
+    return attempt(0).then(function(data){
+      var seen = {};
+      return (data.elements||[]).map(normalize).filter(function(g){
+        if(!g || !g.name) return false;
+        // collapse duplicate nodes/ways for the same building
+        var key = g.name.toLowerCase() + '@' + g.lat.toFixed(3) + ',' + g.lon.toFixed(3);
+        if(seen[key]) return false;
+        seen[key] = 1;
+        return true;
+      });
+    });
+  }
+
+  function normalize(el){
+    var t = el.tags || {};
+    var lat = el.lat != null ? el.lat : (el.center && el.center.lat);
+    var lon = el.lon != null ? el.lon : (el.center && el.center.lon);
+    if(lat == null || lon == null) return null;
+
+    var addr = [
+      [t['addr:housenumber'], t['addr:street']].filter(Boolean).join(' '),
+      t['addr:city'],
+      [t['addr:state'], t['addr:postcode']].filter(Boolean).join(' ')
+    ].filter(Boolean).join(', ');
+
+    return {
+      name:    t.name || t.brand || '',
+      lat: lat, lon: lon,
+      phone:   t.phone || t['contact:phone'] || '',
+      website: t.website || t['contact:website'] || '',
+      hours:   t.opening_hours || '',
+      address: addr,
+      brand:   t.brand || '',
+      sport:   t.sport || '',
+      studio:  isStudio(t),
+      access:  t.access || '',
+      fee:     t.fee || '',
+      showers: t['shower'] || '',
+      osm:     el.type + '/' + el.id
+    };
+  }
+
+  // A traveler asking for "a gym" means weights and cardio, not a yoga class.
+  // OSM tags ~1/3 of these with sport=; the rest we judge by name.
+  var GYM_WORDS    = /fitness|gym|weight|cardio|exercise|crossfit|athletic|training|strength|hiit|personal_training/i;
+  var STUDIO_WORDS = /yoga|pilates|barre|bouldering|climb|martial.?arts|karate|jiu.?jitsu|taekwondo|aikido|judo|dance|ballet|zumba|cycling|spin\s*studio|rowing|gymnastics|massage|physical.?therapy|chiropract/i;
+
+  function isStudio(t){
+    var sport = t.sport || '';
+    if(sport){
+      // sport can be a ;-list - it is only a studio if NOTHING in it is gym-ish
+      if(GYM_WORDS.test(sport)) return false;
+      if(STUDIO_WORDS.test(sport)) return true;
+    }
+    var name = t.name || '';
+    if(GYM_WORDS.test(name)) return false;
+    return STUDIO_WORDS.test(name);
+  }
+
+  // ---- rendering ---------------------------------------------------------
+  // Hand off to whatever maps app the phone actually uses for turn-by-turn.
+  function mapsUrl(g){
+    return 'https://www.google.com/maps/dir/?api=1&travelmode=driving&destination='
+           + g.lat + ',' + g.lon;
+  }
+  function searchUrl(g){
+    return 'https://www.google.com/maps/search/?api=1&query=' +
+           encodeURIComponent(g.name + ' ' + (g.address || (g.lat+','+g.lon)));
+  }
+  function prettyPhone(p){
+    var d = p.replace(/\D/g,'');
+    if(d.length === 11 && d[0] === '1') d = d.slice(1);
+    if(d.length === 10) return '(' + d.slice(0,3) + ') ' + d.slice(3,6) + '-' + d.slice(6);
+    return p;
+  }
+
+  function card(g, i){
+    var badges = [];
+    if(/24\/7/.test(g.hours)) badges.push('<span class="badge hot">Open 24/7</span>');
+    if(g.brand) badges.push('<span class="badge">'+esc(g.brand)+'</span>');
+    if(g.showers === 'yes') badges.push('<span class="badge">Showers</span>');
+    if(g.fee === 'no') badges.push('<span class="badge hot">Free</span>');
+    if(g.access === 'customers') badges.push('<span class="badge">Guests/members</span>');
+
+    var meta = [];
+    if(g.address) meta.push('<div><span class="k">📍</span><span>'+esc(g.address)+'</span></div>');
+    if(g.hours)   meta.push('<div><span class="k">🕑</span><span>'+esc(g.hours)+'</span></div>');
+    if(g.phone)   meta.push('<div><span class="k">📞</span><a href="tel:'+esc(g.phone.replace(/[^\d+]/g,''))+'">'+esc(prettyPhone(g.phone))+'</a></div>');
+    if(g.website) meta.push('<div><span class="k">🔗</span><a href="'+esc(g.website)+'" target="_blank" rel="noopener">Website</a></div>');
+    if(!g.phone)  meta.push('<div><span class="k">ℹ️</span><a href="'+esc(searchUrl(g))+'" target="_blank" rel="noopener">No phone listed — look it up</a></div>');
+
+    return '<article class="gym" style="animation-delay:' + Math.min(i*45,520) + 'ms">'
+      + '<div class="top">'
+      +   '<h2>'+esc(g.name)+'</h2>'
+      +   '<div class="dist"><b>'+g.dist.toFixed(1)+'</b><span>MI '+g.dir+'</span></div>'
+      + '</div>'
+      + (badges.length ? '<div class="badges">'+badges.join('')+'</div>' : '')
+      + (meta.length ? '<div class="meta">'+meta.join('')+'</div>' : '')
+      + '<div class="acts">'
+      +   '<a class="nav" href="'+esc(mapsUrl(g))+'" target="_blank" rel="noopener">Navigate</a>'
+      +   '<a class="call '+(g.phone?'':'off')+'" href="'+(g.phone?'tel:'+esc(g.phone.replace(/[^\d+]/g,'')):'#')+'">Call</a>'
+      + '</div>'
+      + '</article>';
+  }
+
+  function render(gyms, origin, label, hidden){
+    if(!gyms.length){
+      show('<div class="status">No gyms mapped within '+radEl.value+' miles of '
+        + esc(label) + '.'
+        + (hidden ? '<br><br>' + hidden + ' yoga/pilates/climbing studio'+(hidden>1?'s':'')
+                    + ' nearby — tick the box above to show them.' : '')
+        + '<br><br>Try widening the radius — rural stretches are thin.</div>');
+      return;
+    }
+    var head = '<div class="count"><span><em>' + gyms.length + '</em> gym' + (gyms.length>1?'s':'')
+      + ' near ' + esc(label)
+      + (hidden ? ' · ' + hidden + ' studio' + (hidden>1?'s':'') + ' hidden' : '')
+      + '</span><button id="again">Refresh</button></div>';
+    show(head + gyms.map(function(g,i){ return card(g,i); }).join(''));
+    document.getElementById('again').addEventListener('click', function(){
+      run(origin, label);
+    });
+  }
+
+  // ---- flow --------------------------------------------------------------
+  function run(origin, label){
+    lastOrigin = origin; lastLabel = label;
+    loading('Searching for gyms near ' + label + '…');
+    fetchGyms(origin, +radEl.value).then(function(gyms){
+      gyms.forEach(function(g){
+        g.dist = distance(origin, g);
+        g.dir  = bearing(origin, g);
+      });
+      gyms = gyms.filter(function(g){ return g.dist <= +radEl.value + 0.5; })
+                 .sort(function(a,b){ return a.dist - b.dist; });
+      var hidden = 0;
+      if(!studiosEl.checked){
+        hidden = gyms.filter(function(g){ return g.studio; }).length;
+        gyms = gyms.filter(function(g){ return !g.studio; });
+      }
+      render(gyms, origin, label, hidden);
+      try{ localStorage.setItem('grt:last', JSON.stringify({origin:origin,label:label})); }catch(e){}
+    }).catch(function(e){
+      fail('Could not reach the gym database. Check your connection and try again.');
+    });
+  }
+
+  locateBtn.addEventListener('click', function(){
+    if(!navigator.geolocation){ fail('This browser has no GPS support. Search by city instead.'); return; }
+    loading('Getting your location…');
+    navigator.geolocation.getCurrentPosition(function(pos){
+      run({lat:pos.coords.latitude, lon:pos.coords.longitude}, 'you');
+    }, function(err){
+      fail(err.code === 1
+        ? 'Location permission denied. Turn it on, or search by city below.'
+        : 'Could not get a GPS fix. Try searching by city instead.');
+    }, {enableHighAccuracy:true, timeout:12000, maximumAge:60000});
+  });
+
+  function geocode(){
+    var q = placeEl.value.trim();
+    if(!q) return;
+    loading('Looking up "' + q + '"…');
+    fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q='
+          + encodeURIComponent(q))
+      .then(function(r){ return r.json(); })
+      .then(function(res){
+        if(!res.length){ fail('Couldn’t find "' + q + '". Try a city and state.'); return; }
+        var hit = res[0];
+        run({lat:+hit.lat, lon:+hit.lon}, hit.display_name.split(',').slice(0,2).join(',').trim());
+      })
+      .catch(function(){ fail('Location lookup failed. Check your connection.'); });
+  }
+  document.getElementById('goBtn').addEventListener('click', geocode);
+  placeEl.addEventListener('keydown', function(e){ if(e.key === 'Enter') geocode(); });
+
+  function rerun(){ if(lastOrigin) run(lastOrigin, lastLabel); }
+  radEl.addEventListener('change', rerun);
+  studiosEl.addEventListener('change', rerun);
+
+  // ---- add to home screen ------------------------------------------------
+  // This is built to live on a phone home screen, not in a browser tab.
+  (function(){
+    var bar = document.getElementById('install');
+    var txt = document.getElementById('installTxt');
+    var go  = document.getElementById('installGo');
+    var no  = document.getElementById('installNo');
+    var prompt = null;
+
+    var standalone = window.matchMedia('(display-mode: standalone)').matches ||
+                     navigator.standalone === true;
+    var dismissed = false;
+    try{ dismissed = localStorage.getItem('grt:noinstall') === '1'; }catch(e){}
+    if(standalone || dismissed) return;
+
+    function open(html, showBtn){
+      txt.innerHTML = html;
+      go.style.display = showBtn ? '' : 'none';
+      bar.classList.add('show');
+    }
+    no.addEventListener('click', function(){
+      bar.classList.remove('show');
+      try{ localStorage.setItem('grt:noinstall','1'); }catch(e){}
+    });
+
+    // Android / Chrome: real install prompt
+    window.addEventListener('beforeinstallprompt', function(e){
+      e.preventDefault(); prompt = e;
+      var phone = window.matchMedia('(max-width: 800px)').matches;
+      open('<b>Install Gym Road Trip</b><span>'
+           + (phone ? 'Add it to your home screen — opens instantly, works without signal.'
+                    : 'Keep it one click away — opens instantly, works without signal.')
+           + '</span>', true);
+    });
+    go.addEventListener('click', function(){
+      if(!prompt) return;
+      prompt.prompt();
+      prompt.userChoice.then(function(){ prompt = null; bar.classList.remove('show'); });
+    });
+
+    // iOS Safari has no install event - tell them the two taps instead
+    var iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    if(iOS){
+      open('<b>Put it on your home screen</b><span>Tap Share, then \u201cAdd to Home Screen\u201d.</span>', false);
+    }
+
+    window.addEventListener('appinstalled', function(){ bar.classList.remove('show'); });
+  })();
+
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('sw.js').catch(function(){});
+    });
+  }
+})();
+</script>
+</body>
+</html>
