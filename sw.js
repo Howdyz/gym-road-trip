@@ -1,6 +1,6 @@
 // Gym Road Trip service worker.
 // Shell is cached so the app opens with no signal; gym lookups always hit the network.
-var CACHE = 'grt-v1';
+var CACHE = 'grt-v2';
 var SHELL = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', function(e){
@@ -32,10 +32,20 @@ self.addEventListener('fetch', function(e){
   if(url.hostname.indexOf('overpass') > -1 || url.hostname.indexOf('nominatim') > -1) return;
   if(url.origin !== location.origin) return;
 
+  // GitHub Pages sends Cache-Control: max-age=600 on HTML, so a plain fetch() here
+  // can be answered by the browser's own HTTP cache for ten minutes after a deploy -
+  // the network-first intent silently becomes cache-first. Documents bypass it.
+  var accept = e.request.headers.get('accept') || '';
+  var isDoc = e.request.mode === 'navigate' || accept.indexOf('text/html') > -1;
+  var req = isDoc ? new Request(e.request.url, {cache: 'no-store', credentials: 'same-origin'})
+                  : e.request;
+
   e.respondWith(
-    fetch(e.request).then(function(r){
-      var copy = r.clone();
-      caches.open(CACHE).then(function(c){ c.put(e.request, copy); }).catch(function(){});
+    fetch(req).then(function(r){
+      if(r && r.ok){
+        var copy = r.clone();
+        caches.open(CACHE).then(function(c){ c.put(e.request, copy); }).catch(function(){});
+      }
       return r;
     }).catch(function(){ return caches.match(e.request); })
   );
